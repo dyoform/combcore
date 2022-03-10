@@ -14,7 +14,7 @@ import (
 
 var critical sync.Mutex
 var shutdown sync.Mutex
-var empty [32]byte
+
 var COMBInfo struct {
 	Height     uint64
 	Hash       [32]byte
@@ -25,6 +25,7 @@ var COMBInfo struct {
 	Magic      uint32
 	Prefix     map[string]string
 	Path       string
+	Guard      sync.RWMutex
 }
 
 func setup_graceful_shutdown() {
@@ -47,19 +48,21 @@ func combcore_init() {
 	iniflags.SetConfigFile("config.ini")
 	iniflags.Parse()
 
+	//reset to known empty state
 	libcomb.Reset()
 
-	COMBInfo.Network = *comb_network
 	combcore_set_network()
 	setup_graceful_shutdown()
-
-	COMBInfo.Chain = make(map[[32]byte][32]byte)
-	//load our checkpoint (chain start)
-	COMBInfo.Chain[COMBInfo.Hash] = empty
 }
 
 func combcore_set_network() {
+	COMBInfo.Guard.Lock()
+	defer COMBInfo.Guard.Unlock()
+
 	COMBInfo.Prefix = make(map[string]string)
+	COMBInfo.Chain = make(map[[32]byte][32]byte)
+
+	COMBInfo.Network = *comb_network
 	log.Printf("(combcore) loading in %s mode\n", COMBInfo.Network)
 	//every difference between the networks is here (minus whats in libcomb)
 	switch COMBInfo.Network {
@@ -91,6 +94,7 @@ func combcore_set_network() {
 	}
 
 	libcomb.SetHeight(COMBInfo.Height)
+	COMBInfo.Chain[COMBInfo.Hash] = [32]byte{}
 }
 
 func combcore_dump() {
@@ -99,20 +103,32 @@ func combcore_dump() {
 }
 
 func combcore_set_status(status string) {
+	COMBInfo.Guard.Lock()
+	defer COMBInfo.Guard.Unlock()
+
 	if !COMBInfo.StatusLock {
 		COMBInfo.Status = status
 	}
 }
 
 func combcore_lock_status() {
+	COMBInfo.Guard.Lock()
+	defer COMBInfo.Guard.Unlock()
+
 	COMBInfo.StatusLock = true
 }
 func combcore_unlock_status() {
+	COMBInfo.Guard.Lock()
+	defer COMBInfo.Guard.Unlock()
+
 	COMBInfo.StatusLock = false
 }
 
 func combcore_process_block(block Block) (err error) {
-	if block.Metadata.Hash == empty {
+	COMBInfo.Guard.Lock()
+	defer COMBInfo.Guard.Unlock()
+
+	if block.Metadata.Hash == [32]byte{} {
 		return //discard dummy blocks
 	}
 
@@ -143,6 +159,9 @@ func combcore_process_block(block Block) (err error) {
 }
 
 func combcore_reorg(target [32]byte) {
+	COMBInfo.Guard.Lock()
+	defer COMBInfo.Guard.Unlock()
+
 	//target is the highest common block between our chain and the new reorged chain
 	//this function should remove all block data after target, and rollback libcomb to target
 	var ok bool

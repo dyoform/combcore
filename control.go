@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 
 	"libcomb"
 )
@@ -63,7 +62,7 @@ func (c *Control) LoadMerkleSegment(args *MerkleSegment, reply *string) (err err
 		return err
 	}
 
-	*reply = fmt.Sprintf("%X", id)
+	*reply = stringify_hex(id)
 	return nil
 }
 
@@ -111,7 +110,6 @@ type SignDeciderArgs struct {
 func (c *Control) SignDecider(args *SignDeciderArgs, result *[2]string) (err error) {
 	var d libcomb.Decider
 	var id [32]byte
-	fmt.Println(args.ID, args.Destination)
 	if id, err = parse_hex(args.ID); err != nil {
 		return err
 	}
@@ -282,7 +280,6 @@ func (c *Control) DecideMerkleSegment(args *DecideMerkleSegmentArgs, result *Mer
 	}
 
 	if m.ID() != u.ID() {
-		log.Printf("%X != %X\n", m.ID(), u.ID())
 		return fmt.Errorf("address mismatch. branches, leaf or signature is invalid")
 	}
 
@@ -406,9 +403,15 @@ type StatusInfo struct {
 }
 
 func (c *Control) GetStatus(args *struct{}, reply *StatusInfo) (err error) {
+	//prevent race conditions, not that it will really matter for status info
+	COMBInfo.Guard.RLock()
+	defer COMBInfo.Guard.RUnlock()
+	BTCInfo.Guard.RLock()
+	defer BTCInfo.Guard.RUnlock()
+
 	reply.COMBHeight = COMBInfo.Height
-	reply.BTCHeight = BTC.Chain.Height
-	reply.BTCKnownHeight = BTC.Chain.KnownHeight
+	reply.BTCHeight = BTCInfo.Chain.Height
+	reply.BTCKnownHeight = BTCInfo.Chain.KnownHeight
 	reply.Commits = libcomb.GetCommitCount()
 	reply.Status = COMBInfo.Status
 	reply.Network = COMBInfo.Network

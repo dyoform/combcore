@@ -3,8 +3,6 @@ package main
 import (
 	"log"
 
-	"libcomb"
-
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
@@ -16,9 +14,8 @@ var NeoInfo struct {
 
 func neominer_inspect() {
 	log.Println("BTC Node:")
-	log.Printf("\tHeight: %d of %d\n", BTC.Chain.Height, BTC.Chain.KnownHeight)
+	log.Printf("\tHeight: %d of %d\n", BTCInfo.Chain.Height, BTCInfo.Chain.KnownHeight)
 	log.Println("COMB Node:")
-	log.Printf("\tVersion: %s\n", libcomb.Version)
 	log.Printf("\tHeight: %d\n", COMBInfo.Height)
 }
 

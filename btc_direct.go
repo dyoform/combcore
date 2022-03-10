@@ -45,14 +45,18 @@ func direct_parse_block_file(data []byte, blocks *RawData, path string) {
 	}
 }
 
-func direct_trace_chain(blocks *RawData, target [32]byte, history *map[[32]byte][32]byte, length uint64) (block_chain [][32]byte) {
-	//trace back from target to a known block (any block in history)
+func direct_trace_chain(blocks *RawData, target [32]byte, length uint64) (block_chain [][32]byte) {
+	//trace back from target to a known block (any block in COMBInfo.Chain)
 	var hash [32]byte = target
+
+	//lock the chain while we trace it
+	COMBInfo.Guard.RLock()
+	defer COMBInfo.Guard.RUnlock()
 	for {
 		if block, ok := (*blocks)[hash]; ok {
 			block_chain = append(block_chain, hash)
 			hash = block.Previous
-			if _, ok := (*history)[hash]; ok {
+			if _, ok := COMBInfo.Chain[hash]; ok {
 				break
 			}
 		} else {
@@ -64,7 +68,7 @@ func direct_trace_chain(blocks *RawData, target [32]byte, history *map[[32]byte]
 	combcore_set_status(fmt.Sprintf("Mining (%.2f%%)...", progress))
 
 	//check if we actually found a known block
-	if _, ok := (*history)[hash]; !ok {
+	if _, ok := COMBInfo.Chain[hash]; !ok {
 		return nil //nope
 	}
 
@@ -76,7 +80,7 @@ func direct_trace_chain(blocks *RawData, target [32]byte, history *map[[32]byte]
 	return block_chain
 }
 
-func direct_load_trace(blocks *RawData, path string, target [32]byte, history *map[[32]byte][32]byte, length uint64) (chain [][32]byte, err error) {
+func direct_load_trace(blocks *RawData, path string, target [32]byte, length uint64) (chain [][32]byte, err error) {
 	var block_data []byte = make([]byte, 128*1024*1024) //blk files are max 128mb
 	var block_files []string
 	if block_files, err = filepath.Glob(path + "/blocks/blk*.dat"); err != nil {
@@ -95,7 +99,7 @@ func direct_load_trace(blocks *RawData, path string, target [32]byte, history *m
 		direct_parse_block_file(block_data, blocks, block_files[b])
 
 		//now see if we have a valid chain loaded (from target to any block in history)
-		chain = direct_trace_chain(blocks, target, history, length)
+		chain = direct_trace_chain(blocks, target, length)
 
 		if len(chain) != 0 {
 			break //valid chain found
@@ -123,14 +127,14 @@ func direct_check_path(path string) (err error) {
 	log.Printf("(direct) found %d block files\n", len(block_files))
 	return nil
 }
-func direct_get_block_range(path string, target [32]byte, history *map[[32]byte][32]byte, length uint64, out chan<- BlockData) (err error) {
+func direct_get_block_range(path string, target [32]byte, length uint64, out chan<- BlockData) (err error) {
 	defer close(out)
 	var blocks RawData = make(RawData)
 	var chain [][32]byte
 
 	//read the raw block data, tracing the blocks back from the target to a known block (probably a checkpoint)
 	//processed blocks are stored IN MEMORY until a complete/valid chain is found (expect ~1gb of RAM usage)
-	if chain, err = direct_load_trace(&blocks, path, target, history, length); err != nil {
+	if chain, err = direct_load_trace(&blocks, path, target, length); err != nil {
 		return err
 	}
 

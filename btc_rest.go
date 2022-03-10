@@ -8,24 +8,24 @@ import (
 	"net/http"
 )
 
-func rest_trace_chain(client *http.Client, url string, target [32]byte, history *map[[32]byte][32]byte, length uint64) (chain [][32]byte, err error) {
+func rest_trace_chain(client *http.Client, url string, target [32]byte, length uint64) (chain [][32]byte, err error) {
 	var raw_json json.RawMessage
 	var headers []struct {
 		Height            uint64
 		Previousblockhash string
 	}
 
-	//if the target is already in the chain then return early
-	if _, ok := (*history)[target]; ok {
-		return chain, nil
-	}
-
 	//keep tracing the chain back from the tip until we find a block thats known (in history)
 	var hash [32]byte = target
+
 	for {
-		if _, ok := (*history)[hash]; ok {
+		COMBInfo.Guard.RLock()
+		if _, ok := COMBInfo.Chain[hash]; ok {
+			COMBInfo.Guard.RUnlock()
 			break
 		}
+		COMBInfo.Guard.RUnlock()
+
 		chain = append(chain, hash)
 		if raw_json, err = btc_rest_call(client, fmt.Sprintf("%s/headers/1/%x.json", url, hash)); err != nil {
 			return nil, err
@@ -53,14 +53,14 @@ func rest_trace_chain(client *http.Client, url string, target [32]byte, history 
 	return chain, nil
 }
 
-func rest_get_block_range(client *http.Client, url string, target [32]byte, history *map[[32]byte][32]byte, length uint64, out chan<- BlockData) (err error) {
+func rest_get_block_range(client *http.Client, url string, target [32]byte, length uint64, out chan<- BlockData) (err error) {
 	defer close(out)
 	var chain [][32]byte
 	var block BlockData
 
 	//gets a list of blocks that connect the target to a known block (does not have to be the current chain tip)
 	//every block in this list is unknown to combcore
-	if chain, err = rest_trace_chain(client, url, target, history, length); err != nil {
+	if chain, err = rest_trace_chain(client, url, target, length); err != nil {
 		return err
 	}
 

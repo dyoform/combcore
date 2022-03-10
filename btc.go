@@ -21,40 +21,46 @@ type ChainData struct {
 	TopHash     [32]byte
 }
 
-var BTC struct {
+var BTCInfo struct {
 	RestClient *http.Client
 	RestURL    string
 	DirectPath string
 	Chain      ChainData
+	Guard      sync.RWMutex
 }
 
 func btc_init() {
-	BTC.RestURL = fmt.Sprintf("http://%s:%d/rest", *btc_peer, *btc_port)
-	BTC.RestClient = &http.Client{}
+	BTCInfo.RestURL = fmt.Sprintf("http://%s:%d/rest", *btc_peer, *btc_port)
+	BTCInfo.RestClient = &http.Client{}
 
 	if err := direct_check_path(*btc_data); err != nil {
 		log.Printf("(btc) direct mining disabled (%s)\n", err.Error())
 	} else {
-		BTC.DirectPath = *btc_data
+		BTCInfo.DirectPath = *btc_data
+	}
+}
+
+func btc_get_chains() {
+	var err error
+	BTCInfo.Guard.Lock()
+	defer BTCInfo.Guard.Unlock()
+	if BTCInfo.Chain, err = rest_get_chains(BTCInfo.RestClient, BTCInfo.RestURL); err != nil {
+		log.Printf("(btc) failed to get chains (%s)\n", err.Error())
+		BTCInfo.Chain.KnownHeight = 0 //signals we are disconnected
+		return
 	}
 }
 
 func btc_sync() {
-	var err error
-	var delta int64
-	if BTC.Chain, err = rest_get_chains(BTC.RestClient, BTC.RestURL); err != nil {
-		log.Printf("(btc) failed to get chains (%s)\n", err.Error())
-		BTC.Chain.KnownHeight = 0 //signals we are disconnected
-		return
+	//sync chain info with our BTC peer
+	btc_get_chains()
+
+	if COMBInfo.Hash == BTCInfo.Chain.TopHash {
+		return //nothing to do
 	}
 
-	if COMBInfo.Hash == BTC.Chain.TopHash {
-		//log.Printf("nothing to do %X == %X\n", COMBInfo.Hash, BTC.Chain.TopHash)
-		return
-	}
-
-	delta = int64(BTC.Chain.Height) - int64(COMBInfo.Height)
-	//delta does not include reorgs, dont rely on this, only use for status info etc
+	//get block delta for displaying mining progress to the user
+	var delta int64 = int64(BTCInfo.Chain.Height) - int64(COMBInfo.Height)
 	log.Printf("(btc) %d blocks behind...\n", delta)
 
 	var blocks chan BlockData = make(chan BlockData)
@@ -71,20 +77,20 @@ func btc_sync() {
 		wait.Unlock()
 	}()
 
-	var target [32]byte = BTC.Chain.TopHash
-	if err = btc_get_block_range(target, &COMBInfo.Chain, uint64(delta), blocks); err != nil {
+	var target [32]byte = BTCInfo.Chain.TopHash
+	if err := btc_get_block_range(target, uint64(delta), blocks); err != nil {
 		log.Printf("(btc) failed to get blocks (%s)\n", err.Error())
 	}
 	wait.Lock() //dont leave before neominer is finished (only a problem if we use a buffered channel)
 }
 
-func btc_get_block_range(target [32]byte, chain *map[[32]byte][32]byte, delta uint64, blocks chan<- BlockData) (err error) {
-	if BTC.DirectPath != "" && delta > 10 { //use direct mining if its available and delta is big enough (>10)
-		if err = direct_get_block_range(BTC.DirectPath, target, chain, delta, blocks); err != nil {
+func btc_get_block_range(target [32]byte, delta uint64, blocks chan<- BlockData) (err error) {
+	if BTCInfo.DirectPath != "" && delta > 10 { //use direct mining if its available and delta is big enough (>10)
+		if err = direct_get_block_range(BTCInfo.DirectPath, target, delta, blocks); err != nil {
 			return err
 		}
 	} else {
-		if err = rest_get_block_range(BTC.RestClient, BTC.RestURL, target, chain, delta, blocks); err != nil {
+		if err = rest_get_block_range(BTCInfo.RestClient, BTCInfo.RestURL, target, delta, blocks); err != nil {
 			return err
 		}
 	}
