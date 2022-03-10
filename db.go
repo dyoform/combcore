@@ -295,38 +295,42 @@ func db_get_block_by_hash(hash [32]byte) (metadata BlockMetadata) {
 	iter := db.NewIterator(nil, nil)
 	var key []byte
 	var value []byte
+	var m BlockMetadata
 	//iterate in reverse, it will be faster most of the time
 	for iter.Last(); iter.Valid(); iter.Prev() {
 		if len(iter.Key()) == DB_BLOCK_KEY_LENGTH {
 			key = iter.Key()
 			value = iter.Value()
-			metadata = decode_block_metadata(key, value)
-			if metadata.Hash == hash {
-				return metadata
+			m = decode_block_metadata(key, value)
+			if m.Hash == hash {
+				metadata = m
+				break
 			}
 		}
 	}
 	iter.Release()
-	return BlockMetadata{}
+	return metadata
 }
 
 func db_get_block_by_height(height uint64) (metadata BlockMetadata) {
 	iter := db.NewIterator(nil, nil)
 	var key []byte
 	var value []byte
+	var m BlockMetadata
 	//iterate in reverse, it will be faster most of the time
 	for iter.Last(); iter.Valid(); iter.Prev() {
 		if len(iter.Key()) == DB_BLOCK_KEY_LENGTH {
 			key = iter.Key()
 			value = iter.Value()
-			metadata = decode_block_metadata(key, value)
-			if metadata.Height == height {
-				return metadata
+			m = decode_block_metadata(key, value)
+			if m.Height == height {
+				metadata = m
+				break
 			}
 		}
 	}
 	iter.Release()
-	return BlockMetadata{}
+	return metadata
 }
 
 func db_load_blocks(start, end uint64, out chan<- Block) {
