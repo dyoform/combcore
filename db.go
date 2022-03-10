@@ -97,6 +97,8 @@ func db_find_commits(commit [32]byte) (out []uint64) {
 }
 
 func db_open() (err error) {
+	DBInfo.InitialLoad = true
+
 	var lvldb *leveldb.DB
 	var options opt.Options
 	options.Compression = opt.NoCompression
@@ -291,12 +293,13 @@ func db_process_block(batch *leveldb.Batch, block Block) (err error) {
 	return nil
 }
 
-func db_get_block_by_hash(hash [32]byte) (metadata BlockMetadata) {
+func db_get_block_metadata_by_hash(hash [32]byte) (metadata BlockMetadata) {
 	iter := db.NewIterator(nil, nil)
 	var key []byte
 	var value []byte
 	var m BlockMetadata
 	//iterate in reverse, it will be faster most of the time
+
 	for iter.Last(); iter.Valid(); iter.Prev() {
 		if len(iter.Key()) == DB_BLOCK_KEY_LENGTH {
 			key = iter.Key()
@@ -312,25 +315,57 @@ func db_get_block_by_hash(hash [32]byte) (metadata BlockMetadata) {
 	return metadata
 }
 
-func db_get_block_by_height(height uint64) (metadata BlockMetadata) {
+func db_get_block_metadata_by_height(height uint64) (metadata BlockMetadata) {
+	var seek_key [8]byte
+	binary.BigEndian.PutUint64(seek_key[0:8], height)
+
 	iter := db.NewIterator(nil, nil)
 	var key []byte
 	var value []byte
-	var m BlockMetadata
-	//iterate in reverse, it will be faster most of the time
-	for iter.Last(); iter.Valid(); iter.Prev() {
-		if len(iter.Key()) == DB_BLOCK_KEY_LENGTH {
-			key = iter.Key()
-			value = iter.Value()
-			m = decode_block_metadata(key, value)
-			if m.Height == height {
-				metadata = m
+
+	if ok := iter.Seek(seek_key[:]); ok {
+		key = iter.Key()
+		value = iter.Value()
+		metadata = decode_block_metadata(key, value)
+	}
+
+	iter.Release()
+
+	return metadata
+}
+
+func db_get_block_by_height(height uint64) (block BlockData) {
+	var seek_key [8]byte
+	binary.BigEndian.PutUint64(seek_key[0:8], height)
+
+	iter := db.NewIterator(nil, nil)
+	var key []byte
+	var value []byte
+
+	if ok := iter.Seek(seek_key[:]); ok {
+		key = iter.Key()
+		value = iter.Value()
+		metadata := decode_block_metadata(key, value)
+		if metadata.Height == height {
+
+			// Set hash and prev
+			block.Hash = metadata.Hash
+			block.Previous = metadata.Previous
+		}
+
+		for iter.Next() {
+			if len(iter.Key()) == DB_COMMIT_KEY_LENGTH {
+				// Found commit, add to block
+				block.Commits = append(block.Commits, decode_commit(value))
+			} else {
+				// Found next metadata, stop
 				break
 			}
 		}
 	}
+
 	iter.Release()
-	return metadata
+	return block
 }
 
 func db_load_blocks(start, end uint64, out chan<- Block) {
@@ -417,7 +452,6 @@ func db_start() {
 		log.Panicln("(db) cannot load legacy db")
 	}
 
-	DBInfo.InitialLoad = true
 	db_load()
 	DBInfo.InitialLoad = false
 }

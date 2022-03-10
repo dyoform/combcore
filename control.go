@@ -387,13 +387,13 @@ type BlockReply struct {
 
 func (c *Control) GetBlockByHeight(args *int, reply *BlockReply) (err error) {
 	var height uint64 = uint64(*args)
-	var metadata BlockMetadata = db_get_block_by_height(height)
+	var metadata BlockMetadata = db_get_block_metadata_by_height(height)
 	reply.Hash = stringify_hex(metadata.Hash)
 	reply.Height = int(metadata.Height)
 	return nil
 }
 
-type StatusInfo struct {
+type StatusReply struct {
 	COMBHeight     uint64
 	BTCHeight      uint64
 	BTCKnownHeight uint64
@@ -402,7 +402,7 @@ type StatusInfo struct {
 	Network        string
 }
 
-func (c *Control) GetStatus(args *struct{}, reply *StatusInfo) (err error) {
+func (c *Control) GetStatus(args *struct{}, reply *StatusReply) (err error) {
 	//prevent race conditions, not that it will really matter for status info
 	COMBInfo.Guard.RLock()
 	defer COMBInfo.Guard.RUnlock()
@@ -413,12 +413,56 @@ func (c *Control) GetStatus(args *struct{}, reply *StatusInfo) (err error) {
 	reply.BTCHeight = BTCInfo.Chain.Height
 	reply.BTCKnownHeight = BTCInfo.Chain.KnownHeight
 	reply.Commits = libcomb.GetCommitCount()
-	reply.Status = COMBInfo.Status
+	reply.Status = COMBInfo.Status.Message
 	reply.Network = COMBInfo.Network
 	return nil
 }
 
 func (c *Control) GetFingerprint(args *struct{}, reply *string) (err error) {
 	*reply = stringify_hex(db_compute_db_fingerprint())
+	return nil
+}
+
+type PushBlockArgs struct {
+	Hash     string
+	Previous string
+	Commits  []string
+}
+
+func (c *Control) PushBlocks(args *[]PushBlockArgs, reply *struct{}) (err error) {
+	//using this function while mining or loading will cause a panic!
+
+	if DBInfo.InitialLoad {
+		return fmt.Errorf("cannot push during initial load")
+	}
+
+	for _, b := range *args {
+		var blk BlockData
+		if blk.Hash, err = parse_hex(b.Hash); err != nil {
+			return err
+		}
+		if blk.Previous, err = parse_hex(b.Previous); err != nil {
+			return err
+		}
+
+		blk.Commits = make([][32]byte, 0)
+		for _, c := range b.Commits {
+			if commit, err := parse_hex(c); err == nil {
+				blk.Commits = append(blk.Commits, commit)
+			} else {
+				return err
+			}
+		}
+		neominer_process_block(blk)
+	}
+	neominer_write()
+
+	return nil
+}
+
+func (c *Control) GetChainTip(args *struct{}, reply *string) (err error) {
+	COMBInfo.Guard.RLock()
+	*reply = stringify_hex(COMBInfo.Hash)
+	COMBInfo.Guard.RUnlock()
 	return nil
 }

@@ -15,7 +15,7 @@ type BlockData struct {
 	Commits  [][32]byte
 }
 
-type ChainData struct {
+type ChainInfo struct {
 	Height      uint64
 	KnownHeight uint64
 	TopHash     [32]byte
@@ -25,11 +25,18 @@ var BTCInfo struct {
 	RestClient *http.Client
 	RestURL    string
 	DirectPath string
-	Chain      ChainData
+	Chain      ChainInfo
+	Enabled    bool
 	Guard      sync.RWMutex
 }
 
 func btc_init() {
+	BTCInfo.Enabled = *btc_peer != ""
+	if !BTCInfo.Enabled {
+		log.Printf("(btc) mining disabled (no peer configured)")
+		return
+	}
+
 	BTCInfo.RestURL = fmt.Sprintf("http://%s:%d/rest", *btc_peer, *btc_port)
 	BTCInfo.RestClient = &http.Client{}
 
@@ -44,11 +51,14 @@ func btc_get_chains() {
 	var err error
 	BTCInfo.Guard.Lock()
 	defer BTCInfo.Guard.Unlock()
-	if BTCInfo.Chain, err = rest_get_chains(BTCInfo.RestClient, BTCInfo.RestURL); err != nil {
+
+	var chain ChainInfo
+	if chain, err = rest_get_chains(BTCInfo.RestClient, BTCInfo.RestURL); err != nil {
 		log.Printf("(btc) failed to get chains (%s)\n", err.Error())
 		BTCInfo.Chain.KnownHeight = 0 //signals we are disconnected
 		return
 	}
+	BTCInfo.Chain = chain
 }
 
 func btc_sync() {

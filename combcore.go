@@ -16,16 +16,20 @@ var critical sync.Mutex
 var shutdown sync.Mutex
 
 var COMBInfo struct {
-	Height     uint64
-	Hash       [32]byte
-	Chain      map[[32]byte][32]byte //child -> parent
-	Status     string
-	StatusLock bool
-	Network    string
-	Magic      uint32
-	Prefix     map[string]string
-	Path       string
-	Guard      sync.RWMutex
+	Height uint64
+	Hash   [32]byte
+	Chain  map[[32]byte][32]byte //child -> parent
+	Status struct {
+		Message string
+		Lock    bool
+	}
+
+	Network string
+	Magic   uint32
+	Prefix  map[string]string
+	Path    string
+
+	Guard sync.RWMutex
 }
 
 func setup_graceful_shutdown() {
@@ -52,6 +56,7 @@ func combcore_init() {
 	libcomb.Reset()
 
 	combcore_set_network()
+
 	setup_graceful_shutdown()
 }
 
@@ -106,8 +111,8 @@ func combcore_set_status(status string) {
 	COMBInfo.Guard.Lock()
 	defer COMBInfo.Guard.Unlock()
 
-	if !COMBInfo.StatusLock {
-		COMBInfo.Status = status
+	if !COMBInfo.Status.Lock {
+		COMBInfo.Status.Message = status
 	}
 }
 
@@ -115,13 +120,13 @@ func combcore_lock_status() {
 	COMBInfo.Guard.Lock()
 	defer COMBInfo.Guard.Unlock()
 
-	COMBInfo.StatusLock = true
+	COMBInfo.Status.Lock = true
 }
 func combcore_unlock_status() {
 	COMBInfo.Guard.Lock()
 	defer COMBInfo.Guard.Unlock()
 
-	COMBInfo.StatusLock = false
+	COMBInfo.Status.Lock = false
 }
 
 func combcore_process_block(block Block) (err error) {
@@ -165,7 +170,7 @@ func combcore_reorg(target [32]byte) {
 	//target is the highest common block between our chain and the new reorged chain
 	//this function should remove all block data after target, and rollback libcomb to target
 	var ok bool
-	var metadata = db_get_block_by_hash(target)
+	var metadata = db_get_block_metadata_by_hash(target)
 
 	log.Printf("(combcore) reorg encountered, rolling back to block %d\n", metadata.Height)
 

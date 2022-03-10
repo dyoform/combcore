@@ -97,7 +97,7 @@ func rest_get_block(client *http.Client, url string, hash [32]byte) (block Block
 	return block, nil
 }
 
-func rest_get_chains(client *http.Client, url string) (chain ChainData, err error) {
+func rest_get_chains(client *http.Client, url string) (chain ChainInfo, err error) {
 	var raw_json json.RawMessage
 	var raw_chain struct {
 		Blocks        uint64

@@ -28,6 +28,7 @@ func httpHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println(buf.String())*/
 
 	serverCodec := jsonrpc.NewServerCodec(&connection)
+
 	rpc.ServeRequest(serverCodec)
 }
 

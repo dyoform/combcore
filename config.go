@@ -5,7 +5,7 @@ import (
 )
 
 var (
-	btc_peer = flag.String("btc_peer", "127.0.0.1", "")
+	btc_peer = flag.String("btc_peer", "", "")
 	btc_port = flag.Uint("btc_port", 8332, "")
 	btc_data = flag.String("btc_data", "", "")
 
@@ -13,5 +13,6 @@ var (
 	comb_port    = flag.Uint("comb_port", 2211, "")
 	comb_network = flag.String("comb_network", "mainnet", "")
 
-	comb_fingerprint_index = flag.Bool("comb_fingerprint_index", false, "")
+	push_peer = flag.String("push_host", "", "")
+	push_port = flag.Uint("push_port", 2211, "")
 )
