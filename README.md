@@ -82,6 +82,13 @@ rpcbind=127.0.0.1
 rpcport=18332
 ```
 
+Pushing Blocks
+--------------
+Specify a client to push blocks to via:
+```ini
+push_host = 10.0.0.1
+push_port = 2211
+```
 
 Building
 --------
