@@ -41,32 +41,36 @@ func neominer_process_block(block_data BlockData) (reorg bool) {
 	block.Commits = block_data.Commits
 	block.Metadata.Fingerprint = db_compute_block_fingerprint(block.Commits)
 
-	//check if this is an old block
-	if previous, ok := COMBInfo.Chain[block.Metadata.Hash]; ok && previous == block.Metadata.Previous {
-		//we already have this block, discard it
+	//check if we already have this block
+	if _, ok := COMBInfo.Chain[block.Metadata.Hash]; ok {
 		log.Printf("(neominer) block discarded\n")
 		return
-	} else if ok && previous != block.Metadata.Previous {
-		//we have the block, but it has a different parent?
-		log.Panicf("(neominer) corrupted block %X, %X vs %X\n", block.Metadata.Hash, block.Metadata.Previous, previous)
 	}
 
-	if block.Metadata.Previous != COMBInfo.Hash { //reorg!
-		//check we actually have the previous block in the chain
-		if _, ok := COMBInfo.Chain[block.Metadata.Previous]; !ok {
-			log.Panicf("(neominer) chain broken, mining has fucked up %X, %X\n", block.Metadata.Hash, block.Metadata.Previous)
-		}
+	//check that we have the previous block
+	if _, ok := COMBInfo.Chain[block.Metadata.Previous]; !ok {
+		log.Panicf("(neominer) chain broken, mining has fucked up %X, %X\n", block.Metadata.Hash, block.Metadata.Previous)
+	}
 
-		neominer_write() //flush the cache so we dont write back reorg'd blocks
+	//if the previous block isnt the top block its a reorg
+	if block.Metadata.Previous != COMBInfo.Hash {
+		//flush the cache so we dont write back reorg'd blocks
+		neominer_write()
+
+		//remove all the blocks after previous in the chain
 		combcore_reorg(block.Metadata.Previous)
 
+		//the previous block should now be the top block
 		if block.Metadata.Previous != COMBInfo.Hash {
 			log.Panicf("(neominer) reorg failed! %X != %X\n", block.Metadata.Previous, COMBInfo.Hash)
 		}
 	}
 
+	//now process this block
+
 	block.Metadata.Height = COMBInfo.Height + 1
 
+	//this doesnt touch the disk yet, just gets added to the current batch
 	if err = db_process_block(NeoInfo.Batch, block); err != nil {
 		log.Panicf("(neominer) ingest store block failed (%s)\n", err.Error())
 		return

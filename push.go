@@ -51,6 +51,7 @@ func push_sync() {
 	}
 
 	if _, ok = COMBInfo.Chain[tip]; !ok {
+		//resolve this by finding the highest common block then instructing the client to reorg
 		log.Printf("(push) client has an unknown chain")
 		COMBInfo.Guard.RUnlock()
 		return
