@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"sync"
+	"time"
 )
 
 type BlockData struct {
@@ -39,6 +40,7 @@ func btc_init() {
 
 	BTCInfo.RestURL = fmt.Sprintf("http://%s:%d/rest", *btc_peer, *btc_port)
 	BTCInfo.RestClient = &http.Client{}
+	BTCInfo.RestClient.Timeout = time.Second
 
 	if err := direct_check_path(*btc_data); err != nil {
 		log.Printf("(btc) direct mining disabled (%s)\n", err.Error())
@@ -47,23 +49,26 @@ func btc_init() {
 	}
 }
 
-func btc_get_chains() {
-	var err error
+func btc_get_chains() (err error) {
 	BTCInfo.Guard.Lock()
 	defer BTCInfo.Guard.Unlock()
 
 	var chain ChainInfo
 	if chain, err = rest_get_chains(BTCInfo.RestClient, BTCInfo.RestURL); err != nil {
-		log.Printf("(btc) failed to get chains (%s)\n", err.Error())
 		BTCInfo.Chain.KnownHeight = 0 //signals we are disconnected
-		return
+		return err
 	}
 	BTCInfo.Chain = chain
+
+	return nil
 }
 
 func btc_sync() {
 	//sync chain info with our BTC peer
-	btc_get_chains()
+	if err := btc_get_chains(); err != nil {
+		log.Printf("(btc) failed to get chains (%s)", err.Error())
+		return //cant connect to peer
+	}
 
 	if COMBInfo.Hash == BTCInfo.Chain.TopHash {
 		return //nothing to do
@@ -71,7 +76,7 @@ func btc_sync() {
 
 	//get block delta for displaying mining progress to the user
 	var delta int64 = int64(BTCInfo.Chain.Height) - int64(COMBInfo.Height)
-	log.Printf("(btc) %d blocks behind...\n", delta)
+	log.Printf("(btc) %d blocks behind...", delta)
 
 	var blocks chan BlockData = make(chan BlockData)
 	var wait sync.Mutex

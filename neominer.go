@@ -41,17 +41,28 @@ func neominer_process_block(block_data BlockData) (reorg bool) {
 	block.Commits = block_data.Commits
 	block.Metadata.Fingerprint = db_compute_block_fingerprint(block.Commits)
 
-	if block_data.Previous != COMBInfo.Hash { //reorg!
-		if _, ok := COMBInfo.Chain[block_data.Previous]; !ok { //check we actually have the previous block in the chain
-			log.Panicf("(neominer) chain broken, mining has fucked up\n")
-		}
-		neominer_write() //flush the cache so we dont write back reorg'd blocks
-		combcore_reorg(block_data.Previous)
+	//check if this is an old block
+	if previous, ok := COMBInfo.Chain[block.Metadata.Hash]; ok && previous == block.Metadata.Previous {
+		//we already have this block, discard it
+		log.Printf("(neominer) block discarded\n")
+		return
+	} else if ok && previous != block.Metadata.Previous {
+		//we have the block, but it has a different parent?
+		log.Panicf("(neominer) corrupted block %X, %X vs %X\n", block.Metadata.Hash, block.Metadata.Previous, previous)
 	}
 
-	//check the rollback was successful
-	if block_data.Previous != COMBInfo.Hash {
-		log.Panicf("(neominer) reorg failed!")
+	if block.Metadata.Previous != COMBInfo.Hash { //reorg!
+		//check we actually have the previous block in the chain
+		if _, ok := COMBInfo.Chain[block.Metadata.Previous]; !ok {
+			log.Panicf("(neominer) chain broken, mining has fucked up %X, %X\n", block.Metadata.Hash, block.Metadata.Previous)
+		}
+
+		neominer_write() //flush the cache so we dont write back reorg'd blocks
+		combcore_reorg(block.Metadata.Previous)
+
+		if block.Metadata.Previous != COMBInfo.Hash {
+			log.Panicf("(neominer) reorg failed! %X != %X\n", block.Metadata.Previous, COMBInfo.Hash)
+		}
 	}
 
 	block.Metadata.Height = COMBInfo.Height + 1
