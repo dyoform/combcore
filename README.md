@@ -84,10 +84,17 @@ rpcport=18332
 
 Pushing Blocks
 --------------
-Specify a client to push blocks to via:
+Specify a client to push blocks to via config.ini
 ```ini
-push_host = 10.0.0.1
-push_port = 2211
+[push]
+push_client_ip = 10.0.0.1
+push_client_port = 2211
+```
+Disble BTC mining on the client by not specifying a BTC peer. Complete client config.ini:
+```ini
+[combcore]
+comb_host = 10.0.0.1
+comb_port = 2211
 ```
 
 Building

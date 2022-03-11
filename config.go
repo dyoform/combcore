@@ -13,6 +13,6 @@ var (
 	comb_port    = flag.Uint("comb_port", 2211, "")
 	comb_network = flag.String("comb_network", "mainnet", "")
 
-	push_peer = flag.String("push_host", "", "")
-	push_port = flag.Uint("push_port", 2211, "")
+	push_ip   = flag.String("push_client_ip", "", "")
+	push_port = flag.Uint("push_client_port", 2211, "")
 )

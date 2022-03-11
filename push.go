@@ -17,11 +17,11 @@ var PushInfo struct {
 }
 
 func push_init() {
-	PushInfo.Enabled = *push_peer != ""
+	PushInfo.Enabled = *push_ip != ""
 	if !PushInfo.Enabled {
 		return
 	}
-	PushInfo.IP = *push_peer
+	PushInfo.IP = *push_ip
 	PushInfo.Port = uint16(*push_port)
 
 	log.Printf("(push) enabled. pushing to %s:%d", PushInfo.IP, PushInfo.Port)
