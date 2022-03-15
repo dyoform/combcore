@@ -1,6 +1,6 @@
 COMBCore
 --------
-Prototype Wallet/Node for Haircomb built around [libcomb](https://github.com/dyoform/libcomb).
+Prototype Wallet/Node for [Haircomb](https://github.com/natasha-otomoski/haircomb/blob/master/WhyTheCombOfNatashaOtomoskiHas21Teeth.txt) built around [libcomb](https://github.com/dyoform/libcomb).
 
 COMBCore primarily implements commit storage and mining as well as wallet loading and saving.
 It also exposes an RPC control interface which provides everything needed to interact with Haircomb.
@@ -90,7 +90,7 @@ Specify a client to push blocks to via config.ini
 push_client_ip = 10.0.0.1
 push_client_port = 2211
 ```
-Disble BTC mining on the client by not specifying a BTC peer. Complete client config.ini:
+Disable BTC mining on the client by not specifying a BTC peer. Complete client config.ini:
 ```ini
 [combcore]
 comb_host = 10.0.0.1
