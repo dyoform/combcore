@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 )
 
@@ -20,11 +19,11 @@ func rest_trace_chain(client *http.Client, url string, target [32]byte, length u
 
 	for {
 		COMBInfo.Guard.RLock()
-		if _, ok := COMBInfo.Chain[hash]; ok {
-			COMBInfo.Guard.RUnlock()
+		_, ok := COMBInfo.Chain[hash]
+		COMBInfo.Guard.RUnlock()
+		if ok {
 			break
 		}
-		COMBInfo.Guard.RUnlock()
 
 		chain = append(chain, hash)
 		if raw_json, err = btc_rest_call(client, fmt.Sprintf("%s/headers/1/%x.json", url, hash)); err != nil {
@@ -39,6 +38,8 @@ func rest_trace_chain(client *http.Client, url string, target [32]byte, length u
 		if hash, err = parse_hex(headers[0].Previousblockhash); err != nil {
 			return nil, err
 		}
+
+		LogInfo("rest", "tracing %X", hash)
 
 		//just for the end user, this wont factor in any reorgs
 		var progress float64 = (float64(len(chain)) / float64(length)) * 100.0
@@ -87,7 +88,7 @@ func rest_get_block(client *http.Client, url string, hash [32]byte) (block Block
 	btc_parse_block(raw_data, raw_block)
 
 	if raw_block.Hash != hash {
-		log.Panicf("recieved wrong block %X != %X", raw_block.Hash, hash)
+		LogPanic("rest", "recieved wrong block %X != %X", raw_block.Hash, hash)
 	}
 
 	block.Hash = raw_block.Hash

@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"net/rpc"
@@ -20,12 +19,7 @@ func (c *HttpConnection) Write(d []byte) (n int, err error) { return c.out.Write
 func (c *HttpConnection) Close() error                      { return nil }
 
 func httpHandler(w http.ResponseWriter, r *http.Request) {
-
 	var connection HttpConnection = HttpConnection{r.Body, w}
-
-	/*buf := new(strings.Builder)
-	io.Copy(buf, r.Body)
-	log.Println(buf.String())*/
 
 	serverCodec := jsonrpc.NewServerCodec(&connection)
 
@@ -42,7 +36,7 @@ func rpc_serve() (err error) {
 	if listener, err = net.Listen("tcp", bind); err != nil {
 		return err
 	}
-	log.Printf("(rpc) started. listening on %s\n", bind)
+	LogStatus("rpc", "started. listening on %s", bind)
 	go http.Serve(listener, http.HandlerFunc(httpHandler))
 	return nil
 }
@@ -50,6 +44,6 @@ func rpc_serve() (err error) {
 func rpc_start() {
 	var err error
 	if err = rpc_serve(); err != nil {
-		log.Printf("(rpc) failed to start (%v)\n", err)
+		LogError("rpc", "failed to start (%v)", err)
 	}
 }

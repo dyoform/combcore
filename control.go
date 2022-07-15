@@ -403,7 +403,6 @@ type StatusReply struct {
 }
 
 func (c *Control) GetStatus(args *struct{}, reply *StatusReply) (err error) {
-	//prevent race conditions, not that it will really matter for status info
 	COMBInfo.Guard.RLock()
 	defer COMBInfo.Guard.RUnlock()
 	BTCInfo.Guard.RLock()
@@ -413,7 +412,7 @@ func (c *Control) GetStatus(args *struct{}, reply *StatusReply) (err error) {
 	reply.BTCHeight = BTCInfo.Chain.Height
 	reply.BTCKnownHeight = BTCInfo.Chain.KnownHeight
 	reply.Commits = libcomb.GetCommitCount()
-	reply.Status = COMBInfo.Status.Message
+	reply.Status = GUIInfo.Status
 	reply.Network = COMBInfo.Network
 	return nil
 }
@@ -453,9 +452,9 @@ func (c *Control) PushBlocks(args *[]PushBlockArgs, reply *struct{}) (err error)
 				return err
 			}
 		}
-		neominer_process_block(blk)
+		ingest_process_block(blk)
 	}
-	neominer_write()
+	ingest_write()
 
 	return nil
 }

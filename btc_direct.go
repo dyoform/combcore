@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/binary"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 )
@@ -14,7 +13,7 @@ type RawData map[[32]byte]*BlockData
 func direct_parse_block_file(data []byte, blocks *RawData, path string) {
 	f, err := os.Open(path)
 	if err != nil {
-		log.Printf("(direct) cant open file %s (%s)\n", path, err.Error())
+		LogError("direct", "cant open file %s (%s)", path, err.Error())
 		return
 	}
 	stats, _ := f.Stat()
@@ -124,7 +123,7 @@ func direct_check_path(path string) (err error) {
 		return fmt.Errorf("no block files found")
 	}
 
-	log.Printf("(direct) found %d block files\n", len(block_files))
+	LogStatus("direct", "found %d block files", len(block_files))
 	return nil
 }
 func direct_get_block_range(path string, target [32]byte, length uint64, out chan<- BlockData) (err error) {

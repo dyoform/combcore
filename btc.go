@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
-	"log"
 	"net/http"
 	"sync"
 	"time"
@@ -34,7 +33,7 @@ var BTCInfo struct {
 func btc_init() {
 	BTCInfo.Enabled = *btc_peer != ""
 	if !BTCInfo.Enabled {
-		log.Printf("(btc) mining disabled (no peer configured)")
+		LogStatus("btc", "mining disabled (no peer configured)")
 		return
 	}
 
@@ -43,7 +42,7 @@ func btc_init() {
 	BTCInfo.RestClient.Timeout = time.Second
 
 	if err := direct_check_path(*btc_data); err != nil {
-		log.Printf("(btc) direct mining disabled (%s)\n", err.Error())
+		LogStatus("btc", "direct mining disabled (%s)", err.Error())
 	} else {
 		BTCInfo.DirectPath = *btc_data
 	}
@@ -66,7 +65,7 @@ func btc_get_chains() (err error) {
 func btc_sync() {
 	//sync chain info with our BTC peer
 	if err := btc_get_chains(); err != nil {
-		log.Printf("(btc) failed to get chains (%s)", err.Error())
+		LogError("btc", "failed to get chains (%s)", err.Error())
 		return //cant connect to peer
 	}
 
@@ -76,7 +75,8 @@ func btc_sync() {
 
 	//get block delta for displaying mining progress to the user
 	var delta int64 = int64(BTCInfo.Chain.Height) - int64(COMBInfo.Height)
-	log.Printf("(btc) %d blocks behind...", delta)
+
+	LogStatus("btc", "%d blocks behind...", delta)
 
 	var blocks chan BlockData = make(chan BlockData)
 	var wait sync.Mutex
@@ -85,16 +85,16 @@ func btc_sync() {
 	//spin up a goroutine to ingest blocks
 	go func() {
 		for block := range blocks {
-			neominer_process_block(block)
+			ingest_process_block(block)
 		}
 		//block channel closed, now flush the cache
-		neominer_write()
+		ingest_write()
 		wait.Unlock()
 	}()
 
 	var target [32]byte = BTCInfo.Chain.TopHash
 	if err := btc_get_block_range(target, uint64(delta), blocks); err != nil {
-		log.Printf("(btc) failed to get blocks (%s)\n", err.Error())
+		LogError("btc", "failed to get blocks (%s)", err.Error())
 	}
 	wait.Lock() //dont leave before neominer is finished (only a problem if we use a buffered channel)
 }

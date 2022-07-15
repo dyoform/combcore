@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/binary"
 	"libcomb"
-	"log"
 	"os"
 	"os/signal"
 	"sync"
@@ -19,10 +18,6 @@ var COMBInfo struct {
 	Height uint64
 	Hash   [32]byte
 	Chain  map[[32]byte][32]byte //child -> parent
-	Status struct {
-		Message string
-		Lock    bool
-	}
 
 	Network string
 	Magic   uint32
@@ -37,7 +32,7 @@ func setup_graceful_shutdown() {
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-c
-		log.Printf("(combcore) terminate signal detected. shutting down...")
+		LogStatus("combcore", "terminate signal detected. shutting down...")
 		critical.Lock()
 		db.Close()
 		shutdown.Unlock()
@@ -68,7 +63,9 @@ func combcore_set_network() {
 	COMBInfo.Chain = make(map[[32]byte][32]byte)
 
 	COMBInfo.Network = *comb_network
-	log.Printf("(combcore) loading in %s mode\n", COMBInfo.Network)
+
+	LogStatus("combcore", "loading in %s mode", COMBInfo.Network)
+
 	//every difference between the networks is here (minus whats in libcomb)
 	switch COMBInfo.Network {
 	case "mainnet":
@@ -95,38 +92,11 @@ func combcore_set_network() {
 		COMBInfo.Prefix["decider"] = "\\purse\\data\\"
 		libcomb.SwitchToTestnet()
 	default:
-		log.Panicf("unknown network %s\n", COMBInfo.Network)
+		LogPanic("combcore", "unknown network %s", COMBInfo.Network)
 	}
 
 	libcomb.SetHeight(COMBInfo.Height)
 	COMBInfo.Chain[COMBInfo.Hash] = [32]byte{}
-}
-
-func combcore_dump() {
-	db_inspect()
-	neominer_inspect()
-}
-
-func combcore_set_status(status string) {
-	COMBInfo.Guard.Lock()
-	defer COMBInfo.Guard.Unlock()
-
-	if !COMBInfo.Status.Lock {
-		COMBInfo.Status.Message = status
-	}
-}
-
-func combcore_lock_status() {
-	COMBInfo.Guard.Lock()
-	defer COMBInfo.Guard.Unlock()
-
-	COMBInfo.Status.Lock = true
-}
-func combcore_unlock_status() {
-	COMBInfo.Guard.Lock()
-	defer COMBInfo.Guard.Unlock()
-
-	COMBInfo.Status.Lock = false
 }
 
 func combcore_process_block(block Block) (err error) {
@@ -138,12 +108,12 @@ func combcore_process_block(block Block) (err error) {
 	}
 
 	if !DBInfo.InitialLoad {
-		log.Printf("(combcore) processing %d\n", block.Metadata.Height)
+		LogInfo("combcore", "processing %d", block.Metadata.Height)
 	}
 
 	if block.Metadata.Previous != COMBInfo.Hash { //sanity check
-		log.Printf("%d %X %d %X (%X)\n", COMBInfo.Height, COMBInfo.Hash, block.Metadata.Height, block.Metadata.Hash, block.Metadata.Previous)
-		log.Panicf("(combcore) sanity check failed, chain is broken")
+		LogError("combcore", "%d %X %d %X (%X)", COMBInfo.Height, COMBInfo.Hash, block.Metadata.Height, block.Metadata.Hash, block.Metadata.Previous)
+		LogError("combcore", "sanity check failed, chain is broken")
 	}
 
 	var lib_block libcomb.Block
@@ -155,8 +125,8 @@ func combcore_process_block(block Block) (err error) {
 
 	COMBInfo.Height = libcomb.GetHeight()
 	if COMBInfo.Height != block.Metadata.Height { //sanity check
-		log.Printf("%d %d %X\n", COMBInfo.Height, block.Metadata.Height, block.Metadata.Hash)
-		log.Panicf("(combcore) sanity check failed, height mismatch")
+		LogError("combcore", "%d %d %X\n", COMBInfo.Height, block.Metadata.Height, block.Metadata.Hash)
+		LogError("combcore", "sanity check failed, height mismatch")
 	}
 	COMBInfo.Chain[block.Metadata.Hash] = COMBInfo.Hash
 	COMBInfo.Hash = block.Metadata.Hash
@@ -172,21 +142,21 @@ func combcore_reorg(target [32]byte) {
 	var ok bool
 	var metadata = db_get_block_metadata_by_hash(target)
 
-	log.Printf("(combcore) reorg encountered, rolling back to block %d\n", metadata.Height)
+	LogStatus("combcore", "reorg encountered, rolling back to block %d", metadata.Height)
 
-	log.Printf("(combcore) tracing back...\n")
+	LogStatus("combcore", "tracing back...")
 	//trace back our in-memory chain
 	for COMBInfo.Hash != target {
 		if COMBInfo.Hash, ok = COMBInfo.Chain[COMBInfo.Hash]; !ok {
-			log.Panicf("reorg past checkpoint is not possible\n")
+			LogPanic("combcore", "reorg past checkpoint is not possible")
 		}
 	}
 
-	log.Printf("(combcore) removing blocks from database...\n")
+	LogStatus("combcore", "removing blocks from database...")
 	//remove reorg'd blocks from the db
 	db_remove_blocks_after(metadata.Height + 1)
 
-	log.Printf("(combcore) unloading blocks...\n")
+	LogStatus("combcore", "unloading blocks...")
 	//unload libcomb to the target height
 	libcomb.GetLock()
 	for COMBInfo.Height != metadata.Height {
@@ -194,5 +164,6 @@ func combcore_reorg(target [32]byte) {
 	}
 	libcomb.FinishReorg()
 	libcomb.ReleaseLock()
-	log.Printf("(combcore) finished at %X (%d)\n", COMBInfo.Hash, COMBInfo.Height)
+
+	LogStatus("combcore", "finished at %X (%d)", COMBInfo.Hash, COMBInfo.Height)
 }

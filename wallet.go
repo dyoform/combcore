@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"log"
 	"strings"
 
 	"libcomb"
@@ -211,6 +210,8 @@ func wallet_load_construct(construct string) (address [32]byte, err error) {
 func wallet_load(data string) (err error) {
 	combcore_set_status("Loading Wallet...")
 	combcore_lock_status()
+	defer combcore_set_status("Idle")
+	defer combcore_unlock_status()
 
 	var lines []string = strings.Split(data, "\n")
 	var address [32]byte
@@ -219,14 +220,13 @@ func wallet_load(data string) (err error) {
 			continue
 		}
 		if address, err = wallet_load_construct(line); err != nil {
-			log.Printf("(import) load construct error (%s)", err.Error())
+			LogError("import", "load construct error (%s)", err.Error())
+			return err
 		} else {
-			log.Printf("(import) loaded construct (%X)", address)
+			LogStatus("import", "loaded construct (%X)", address)
 		}
 	}
 
-	combcore_unlock_status()
-	combcore_set_status("Idle")
 	return nil
 }
 

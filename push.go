@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -24,7 +23,7 @@ func push_init() {
 	PushInfo.IP = *push_ip
 	PushInfo.Port = uint16(*push_port)
 
-	log.Printf("(push) enabled. pushing to %s:%d", PushInfo.IP, PushInfo.Port)
+	LogStatus("push", "enabled. pushing to %s:%d", PushInfo.IP, PushInfo.Port)
 }
 
 func push_sync() {
@@ -39,20 +38,19 @@ func push_sync() {
 
 	var tip [32]byte
 	if tip, err = push_get_chain_tip(client); err != nil {
-		log.Printf("(push) failed to get chain tip (%s)", err.Error())
+		LogError("push", "failed to get chain tip (%s)", err.Error())
 		return
 	}
 
 	COMBInfo.Guard.RLock()
 	if tip == COMBInfo.Hash {
-		//log.Printf("(push) nothing to do")
 		COMBInfo.Guard.RUnlock()
 		return
 	}
 
 	if _, ok = COMBInfo.Chain[tip]; !ok {
 		//resolve this by finding the highest common block then instructing the client to reorg
-		log.Printf("(push) client has an unknown chain")
+		LogError("push", "client has an unknown chain")
 		COMBInfo.Guard.RUnlock()
 		return
 	}
@@ -72,18 +70,18 @@ func push_sync() {
 				continue
 			}
 		}
-		log.Fatalf("(push) trace failed??")
+		LogPanic("push", "trace failed??")
 	}
 	COMBInfo.Guard.RUnlock()
 
-	log.Printf("(push) pushing %d blocks...", delta)
+	LogStatus("push", "pushing %d blocks...", delta)
 
 	if err = push_blocks(client, start, delta); err != nil {
-		log.Printf("(push) sync failed (%s)", err.Error())
+		LogError("push", "sync failed (%s)", err.Error())
 		return
 	}
 
-	log.Printf("(push) %d blocks synced", delta)
+	LogStatus("push", "%d blocks synced", delta)
 }
 
 func push_blocks(client *http.Client, start uint64, delta uint64) (err error) {
@@ -98,7 +96,7 @@ func push_blocks(client *http.Client, start uint64, delta uint64) (err error) {
 		batch = make([]BlockData, 0)
 		for x := uint64(0); x < batch_size && i+x < delta; x++ {
 			if start+i+x != height {
-				log.Panicf("missed some blocks")
+				LogError("push", "missed some blocks")
 			}
 			height = start + i + x + 1
 
@@ -175,7 +173,7 @@ func push_rpc(client *http.Client, method string, params string) (response strin
 
 	req, err = http.NewRequest("POST", fmt.Sprintf("http://%s:%d", PushInfo.IP, PushInfo.Port), body)
 	if err != nil {
-		log.Fatal(err)
+		LogPanic("push", "cannot parse")
 	}
 	req.Header.Set("Content-Type", "text/plain")
 

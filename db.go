@@ -4,8 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"hash"
-	"log"
-	"math/rand"
 	"sync"
 
 	"libcomb"
@@ -175,27 +173,6 @@ func encode_block_metadata(data BlockMetadata) (key [8]byte, value [96]byte) {
 	return key, value
 }
 
-func db_inspect() {
-	iter := db.NewIterator(nil, nil)
-
-	var sizes map[uint16]uint64 = make(map[uint16]uint64)
-
-	var total uint64
-	var total_keys uint64
-	for iok := iter.First(); iok; iok = iter.Next() {
-		total += uint64(len(iter.Key())) + uint64(len(iter.Value()))
-		total_keys++
-		sizes[uint16(len(iter.Key()))] += 1
-	}
-	log.Println("Database:")
-	log.Printf("\tSize: %0.2f mb\n", float64(total)/(1024*1024))
-	log.Printf("\tKeys: %d\n", total_keys)
-	for key, value := range sizes {
-		log.Printf("\t\t%d: %d\n", key, value)
-	}
-	iter.Release()
-}
-
 func db_get_version() uint16 {
 	var key [2]byte
 	var version uint16 = 1
@@ -203,36 +180,6 @@ func db_get_version() uint16 {
 		version = binary.BigEndian.Uint16(data)
 	}
 	return version
-}
-
-func db_debug_remove_after(height uint64) {
-	var start_key [8]byte = uint64_to_bytes(height)
-	batch := new(leveldb.Batch)
-	iter := db.NewIterator(nil, nil)
-	iter.Seek(start_key[:])
-	batch.Delete(iter.Key())
-	for iter.Next() {
-		batch.Delete(iter.Key())
-	}
-	iter.Release()
-	db_write(batch)
-}
-
-func db_debug_corrupt_after(height uint64) {
-	batch := new(leveldb.Batch)
-	for {
-		if rand.Float64() < 0.5 {
-			var key [8]byte = uint64_to_bytes(height)
-			if value, err := db.Get(key[:], nil); err == nil {
-				value[0] = 0
-				batch.Put(key[:], value)
-			} else {
-				break
-			}
-		}
-		height++
-	}
-	db_write(batch)
 }
 
 func db_store_block(batch *leveldb.Batch, block *Block) (err error) {
@@ -415,7 +362,7 @@ func db_load() {
 			var fingerprint [32]byte = db_compute_block_fingerprint(block.Commits)
 			if block.Metadata.Fingerprint != fingerprint {
 				//recovery not implemented yet
-				log.Panicf("(db) fingerprint mismatch on block %d (%X != %X)\n", block.Metadata.Height, block.Metadata.Fingerprint, fingerprint)
+				LogPanic("db", "fingerprint mismatch on block %d (%X != %X)", block.Metadata.Height, block.Metadata.Fingerprint, fingerprint)
 			}
 			combcore_process_block(block)
 			count++
@@ -425,7 +372,7 @@ func db_load() {
 	db_load_blocks(0, (^uint64(0))-1, blocks)
 	wait.Lock()
 
-	log.Printf("(db) loaded %d blocks\n", count)
+	LogStatus("db", "loaded %d blocks", count)
 }
 
 func db_new() {
@@ -440,16 +387,16 @@ func db_new() {
 
 func db_start() {
 	if db_is_new {
-		log.Printf("(db) new database created (version %d)\n", DB_CURRENT_VERSION)
+		LogStatus("db", "new database created (version %d)", DB_CURRENT_VERSION)
 		db_new()
 		return
 	}
 
-	log.Printf("(db) started. loading...")
+	LogStatus("db", "started. loading...")
 
 	DBInfo.Version = db_get_version()
 	if DBInfo.Version != DB_CURRENT_VERSION {
-		log.Panicln("(db) cannot load legacy db")
+		LogPanic("db", "cannot load legacy db")
 	}
 
 	db_load()
