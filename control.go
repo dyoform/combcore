@@ -468,21 +468,31 @@ func (c *Control) GetChainTip(args *struct{}, reply *string) (err error) {
 	return nil
 }
 
-func (c *Control) DumpP2WSHCount(args *struct{}, reply *struct{}) (err error) {
+func (c *Control) DumpP2WSHCount(args *string, reply *struct{}) (err error) {
 	var blocks chan Block = make(chan Block)
 	var wait sync.Mutex
-	f, _ := os.Create("count.txt")
-	count := 481822
+
+	if *args == "" {
+		return fmt.Errorf("specify file name")
+	}
+
+	LogStatus("control", "writing to %s", *args)
+
+	f, _ := os.Create(*args)
 	wait.Lock()
 	go func() {
 		for block := range blocks {
-			fmt.Fprintf(f, "%d %d\n", count, len(block.Commits))
-			count++
+			if block.Metadata.Hash == [32]byte{} {
+				continue
+			}
+			fmt.Fprintf(f, "%d %d\n", block.Metadata.Height, len(block.Commits))
 		}
 		wait.Unlock()
 	}()
 	db_load_blocks(0, (^uint64(0))-1, blocks)
 	wait.Lock()
 	f.Close()
+
+	LogStatus("control", "finished")
 	return nil
 }
