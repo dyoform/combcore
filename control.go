@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"sync"
 
 	"libcomb"
 )
@@ -463,5 +465,24 @@ func (c *Control) GetChainTip(args *struct{}, reply *string) (err error) {
 	COMBInfo.Guard.RLock()
 	*reply = stringify_hex(COMBInfo.Hash)
 	COMBInfo.Guard.RUnlock()
+	return nil
+}
+
+func (c *Control) DumpP2WSHCount(args *struct{}, reply *struct{}) (err error) {
+	var blocks chan Block = make(chan Block)
+	var wait sync.Mutex
+	f, _ := os.Create("count.txt")
+	count := 481822
+	wait.Lock()
+	go func() {
+		for block := range blocks {
+			fmt.Fprintf(f, "%d %d\n", count, len(block.Commits))
+			count++
+		}
+		wait.Unlock()
+	}()
+	db_load_blocks(0, (^uint64(0))-1, blocks)
+	wait.Lock()
+	f.Close()
 	return nil
 }
