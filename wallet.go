@@ -220,10 +220,10 @@ func wallet_load(data string) (err error) {
 			continue
 		}
 		if address, err = wallet_load_construct(line); err != nil {
-			LogError("import", "load construct error (%s)", err.Error())
+			log_error("import", "load construct error (%s)", err.Error())
 			return err
 		} else {
-			LogStatus("import", "loaded construct (%X)", address)
+			log_status("import", "loaded construct (%X)", address)
 		}
 	}
 

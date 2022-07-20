@@ -13,7 +13,7 @@ type RawData map[[32]byte]*BlockData
 func direct_parse_block_file(data []byte, blocks *RawData, path string) {
 	f, err := os.Open(path)
 	if err != nil {
-		LogError("direct", "cant open file %s (%s)", path, err.Error())
+		log_error("direct", "cant open file %s (%s)", path, err.Error())
 		return
 	}
 	stats, _ := f.Stat()
@@ -97,10 +97,13 @@ func direct_load_trace(blocks *RawData, path string, target [32]byte, length uin
 		//we preallocate and pass in a 128mb buffer to read the block file into (block_data)
 		direct_parse_block_file(block_data, blocks, block_files[b])
 
+		log_status("direct", "processed %s", block_files[b])
+
 		//now see if we have a valid chain loaded (from target to any block in history)
 		chain = direct_trace_chain(blocks, target, length)
 
 		if len(chain) != 0 {
+			log_status("direct", "chain connected. finished")
 			break //valid chain found
 		}
 	}
@@ -123,7 +126,7 @@ func direct_check_path(path string) (err error) {
 		return fmt.Errorf("no block files found")
 	}
 
-	LogStatus("direct", "found %d block files", len(block_files))
+	log_status("direct", "found %d block files", len(block_files))
 	return nil
 }
 func direct_get_block_range(path string, target [32]byte, length uint64, out chan<- BlockData) (err error) {

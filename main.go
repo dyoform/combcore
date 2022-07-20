@@ -5,7 +5,7 @@ import (
 )
 
 func main() {
-	SetLogFile("combcore.log")
+	set_log_file("combcore.log")
 
 	var err error
 
@@ -17,7 +17,7 @@ func main() {
 	btc_init()
 
 	if err = db_open(); err != nil {
-		LogPanic("db", "failed to open (%s)", err.Error())
+		log_panic("db", "failed to open (%s)", err.Error())
 	}
 
 	rpc_start()

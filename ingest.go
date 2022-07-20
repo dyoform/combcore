@@ -11,16 +11,20 @@ var IngestInfo struct {
 }
 
 func ingest_init() {
-	IngestInfo.BatchCapacity = 10000
+	IngestInfo.BatchCapacity = 1000
 	IngestInfo.BatchCached = 0
 	IngestInfo.Batch = new(leveldb.Batch)
 }
 
 func ingest_write() {
-	if err := db_write(IngestInfo.Batch); err != nil {
-		LogPanic("ingest", "write batch failed (%s)", err.Error())
+	if IngestInfo.BatchCached == 0 {
 		return
 	}
+	if err := db_write(IngestInfo.Batch); err != nil {
+		log_panic("ingest", "write batch failed (%s)", err.Error())
+		return
+	}
+	log_status("ingest", "height %d", COMBInfo.Height)
 	IngestInfo.BatchCached = 0
 }
 
@@ -34,13 +38,13 @@ func ingest_process_block(block_data BlockData) (reorg bool) {
 
 	//check if we already have this block
 	if _, ok := COMBInfo.Chain[block.Metadata.Hash]; ok {
-		LogInfo("ingest", "block discarded %X", block.Metadata.Hash)
+		log_status("ingest", "block discarded %X", block.Metadata.Hash)
 		return
 	}
 
 	//check that we have the previous block
 	if _, ok := COMBInfo.Chain[block.Metadata.Previous]; !ok {
-		LogPanic("ingest", "chain broken, mining has fucked up %X, %X", block.Metadata.Hash, block.Metadata.Previous)
+		log_panic("ingest", "chain broken, mining has fucked up %X, %X", block.Metadata.Hash, block.Metadata.Previous)
 	}
 
 	//if the previous block isnt the top block its a reorg
@@ -53,7 +57,7 @@ func ingest_process_block(block_data BlockData) (reorg bool) {
 
 		//the previous block should now be the top block
 		if block.Metadata.Previous != COMBInfo.Hash {
-			LogPanic("ingest", "reorg failed! %X != %X", block.Metadata.Previous, COMBInfo.Hash)
+			log_panic("ingest", "reorg failed! %X != %X", block.Metadata.Previous, COMBInfo.Hash)
 		}
 	}
 
@@ -63,12 +67,12 @@ func ingest_process_block(block_data BlockData) (reorg bool) {
 
 	//this doesnt touch the disk yet, just gets added to the current batch
 	if err = db_process_block(IngestInfo.Batch, block); err != nil {
-		LogPanic("ingest", "store block failed (%s)", err.Error())
+		log_panic("ingest", "store block failed (%s)", err.Error())
 		return
 	}
 	IngestInfo.BatchCached++
 	if err = combcore_process_block(block); err != nil {
-		LogPanic("ingest", "process block failed (%s)", err.Error())
+		log_panic("ingest", "process block failed (%s)", err.Error())
 	}
 
 	if IngestInfo.BatchCached >= IngestInfo.BatchCapacity {

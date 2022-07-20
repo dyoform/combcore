@@ -362,7 +362,7 @@ func db_load() {
 			var fingerprint [32]byte = db_compute_block_fingerprint(block.Commits)
 			if block.Metadata.Fingerprint != fingerprint {
 				//recovery not implemented yet
-				LogPanic("db", "fingerprint mismatch on block %d (%X != %X)", block.Metadata.Height, block.Metadata.Fingerprint, fingerprint)
+				log_panic("db", "fingerprint mismatch on block %d (%X != %X)", block.Metadata.Height, block.Metadata.Fingerprint, fingerprint)
 			}
 			combcore_process_block(block)
 			count++
@@ -372,7 +372,7 @@ func db_load() {
 	db_load_blocks(0, (^uint64(0))-1, blocks)
 	wait.Lock()
 
-	LogStatus("db", "loaded %d blocks", count)
+	log_status("db", "loaded %d blocks", count)
 }
 
 func db_new() {
@@ -387,16 +387,16 @@ func db_new() {
 
 func db_start() {
 	if db_is_new {
-		LogStatus("db", "new database created (version %d)", DB_CURRENT_VERSION)
+		log_status("db", "new database created (version %d)", DB_CURRENT_VERSION)
 		db_new()
 		return
 	}
 
-	LogStatus("db", "started. loading...")
+	log_status("db", "started. loading...")
 
 	DBInfo.Version = db_get_version()
 	if DBInfo.Version != DB_CURRENT_VERSION {
-		LogPanic("db", "cannot load legacy db")
+		log_panic("db", "cannot load legacy db")
 	}
 
 	db_load()

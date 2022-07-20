@@ -39,7 +39,7 @@ func rest_trace_chain(client *http.Client, url string, target [32]byte, length u
 			return nil, err
 		}
 
-		LogInfo("rest", "tracing %X", hash)
+		log_info("rest", "tracing %X", hash)
 
 		//just for the end user, this wont factor in any reorgs
 		var progress float64 = (float64(len(chain)) / float64(length)) * 100.0
@@ -61,9 +61,14 @@ func rest_get_block_range(client *http.Client, url string, target [32]byte, leng
 
 	//gets a list of blocks that connect the target to a known block (does not have to be the current chain tip)
 	//every block in this list is unknown to combcore
+
+	log_status("rest", "tracing chain...")
+
 	if chain, err = rest_trace_chain(client, url, target, length); err != nil {
 		return err
 	}
+
+	log_status("rest", "getting blocks...")
 
 	for i, h := range chain {
 		if block, err = rest_get_block(client, url, h); err != nil {
@@ -88,7 +93,7 @@ func rest_get_block(client *http.Client, url string, hash [32]byte) (block Block
 	btc_parse_block(raw_data, raw_block)
 
 	if raw_block.Hash != hash {
-		LogPanic("rest", "recieved wrong block %X != %X", raw_block.Hash, hash)
+		log_panic("rest", "recieved wrong block %X != %X", raw_block.Hash, hash)
 	}
 
 	block.Hash = raw_block.Hash

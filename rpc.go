@@ -36,7 +36,7 @@ func rpc_serve() (err error) {
 	if listener, err = net.Listen("tcp", bind); err != nil {
 		return err
 	}
-	LogStatus("rpc", "started. listening on %s", bind)
+	log_status("rpc", "started. listening on %s", bind)
 	go http.Serve(listener, http.HandlerFunc(httpHandler))
 	return nil
 }
@@ -44,6 +44,6 @@ func rpc_serve() (err error) {
 func rpc_start() {
 	var err error
 	if err = rpc_serve(); err != nil {
-		LogError("rpc", "failed to start (%v)", err)
+		log_error("rpc", "failed to start (%v)", err)
 	}
 }

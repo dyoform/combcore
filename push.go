@@ -23,7 +23,7 @@ func push_init() {
 	PushInfo.IP = *push_ip
 	PushInfo.Port = uint16(*push_port)
 
-	LogStatus("push", "enabled. pushing to %s:%d", PushInfo.IP, PushInfo.Port)
+	log_status("push", "enabled. pushing to %s:%d", PushInfo.IP, PushInfo.Port)
 }
 
 func push_sync() {
@@ -38,7 +38,7 @@ func push_sync() {
 
 	var tip [32]byte
 	if tip, err = push_get_chain_tip(client); err != nil {
-		LogError("push", "failed to get chain tip (%s)", err.Error())
+		log_error("push", "failed to get chain tip (%s)", err.Error())
 		return
 	}
 
@@ -50,7 +50,7 @@ func push_sync() {
 
 	if _, ok = COMBInfo.Chain[tip]; !ok {
 		//resolve this by finding the highest common block then instructing the client to reorg
-		LogError("push", "client has an unknown chain")
+		log_error("push", "client has an unknown chain")
 		COMBInfo.Guard.RUnlock()
 		return
 	}
@@ -70,18 +70,18 @@ func push_sync() {
 				continue
 			}
 		}
-		LogPanic("push", "trace failed??")
+		log_panic("push", "trace failed??")
 	}
 	COMBInfo.Guard.RUnlock()
 
-	LogStatus("push", "pushing %d blocks...", delta)
+	log_status("push", "pushing %d blocks...", delta)
 
 	if err = push_blocks(client, start, delta); err != nil {
-		LogError("push", "sync failed (%s)", err.Error())
+		log_error("push", "sync failed (%s)", err.Error())
 		return
 	}
 
-	LogStatus("push", "%d blocks synced", delta)
+	log_status("push", "%d blocks synced", delta)
 }
 
 func push_blocks(client *http.Client, start uint64, delta uint64) (err error) {
@@ -96,7 +96,7 @@ func push_blocks(client *http.Client, start uint64, delta uint64) (err error) {
 		batch = make([]BlockData, 0)
 		for x := uint64(0); x < batch_size && i+x < delta; x++ {
 			if start+i+x != height {
-				LogError("push", "missed some blocks")
+				log_error("push", "missed some blocks")
 			}
 			height = start + i + x + 1
 
@@ -173,7 +173,7 @@ func push_rpc(client *http.Client, method string, params string) (response strin
 
 	req, err = http.NewRequest("POST", fmt.Sprintf("http://%s:%d", PushInfo.IP, PushInfo.Port), body)
 	if err != nil {
-		LogPanic("push", "cannot parse")
+		log_panic("push", "cannot parse")
 	}
 	req.Header.Set("Content-Type", "text/plain")
 

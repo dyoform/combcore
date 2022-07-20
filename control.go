@@ -476,7 +476,7 @@ func (c *Control) DumpP2WSHCount(args *string, reply *struct{}) (err error) {
 		return fmt.Errorf("specify file name")
 	}
 
-	LogStatus("control", "writing to %s", *args)
+	log_status("control", "writing to %s", *args)
 
 	f, _ := os.Create(*args)
 	wait.Lock()
@@ -493,6 +493,6 @@ func (c *Control) DumpP2WSHCount(args *string, reply *struct{}) (err error) {
 	wait.Lock()
 	f.Close()
 
-	LogStatus("control", "finished")
+	log_status("control", "finished")
 	return nil
 }
