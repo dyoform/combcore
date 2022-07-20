@@ -132,6 +132,10 @@ func btc_rest_call(client *http.Client, url string) (json.RawMessage, error) {
 		return nil, err
 	}
 
+	if response.StatusCode != 200 {
+		return nil, fmt.Errorf("response not OK")
+	}
+
 	response_data, err := ioutil.ReadAll(response.Body)
 	response.Body.Close()
 	if err != nil {
