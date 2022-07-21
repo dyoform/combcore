@@ -17,5 +17,5 @@ func combcore_lock_status() {
 }
 
 func combcore_unlock_status() {
-	GUIInfo.StatusLocked = true
+	GUIInfo.StatusLocked = false
 }
